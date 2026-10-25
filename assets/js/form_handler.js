@@ -2,18 +2,20 @@ const getEl = (id) => document.getElementById(id);
 
 const getStockStatus = (stock) => (stock >= 15 ? 'Stok Aman' : 'Stok Menipis');
 
-const getFormValues = () => ({
-  name: getEl('product-name').value.trim(),
-  category: getEl('product-category').value,
-  price: parseFloat(getEl('product-price').value),
-  stock: parseInt(getEl('product-stock').value, 10),
+// [UBAH] ditambah parameter prefix: '' = form tambah, 'edit-' = form edit (modal)
+const getFormValues = (prefix = '') => ({
+  name: getEl(prefix + 'product-name').value.trim(),
+  category: getEl(prefix + 'product-category').value,
+  price: parseFloat(getEl(prefix + 'product-price').value),
+  stock: parseInt(getEl(prefix + 'product-stock').value, 10),
 });
 
-const validateProduct = ({ name, category, price, stock }) => {
+// [UBAH] ditambah parameter excludeId: saat EDIT, produk itu sendiri tidak dianggap nama kembar
+const validateProduct = ({ name, category, price, stock }, excludeId = null) => {
   const errors = {};
   if (!name) {
     errors['product-name'] = 'Nama produk wajib diisi.';
-  } else if (productDataset.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+  } else if (productDataset.some((p) => p.id !== excludeId && p.name.toLowerCase() === name.toLowerCase())) {
     errors['product-name'] = 'Nama produk sudah ada.';
   }
   if (!category) errors['product-category'] = 'Pilih kategori.';
@@ -30,23 +32,9 @@ const showFeedback = (el, message, type) => {
 const clearInvalidMarks = () =>
   document.querySelectorAll('.invalid').forEach((el) => el.classList.remove('invalid'));
 
-const markInvalid = (errors) =>
-  Object.keys(errors).forEach((id) => getEl(id).classList.add('invalid'));
-
-// ===== LIVE PREVIEW =====
-const setPreview = (id, text, placeholder) => {
-  const el = getEl(id);
-  el.textContent = text || placeholder;
-  el.classList.toggle('muted', !text);
-};
-
-const updatePreview = () => {
-  const { name, category, price, stock } = getFormValues();
-  setPreview('preview-name', name, 'Belum diisi');
-  setPreview('preview-category', category, 'Belum dipilih');
-  setPreview('preview-price', isNaN(price) ? '' : formatRupiah(price), 'Belum diisi');
-  setPreview('preview-stock', isNaN(stock) ? '' : `${stock} (${getStockStatus(stock)})`, 'Belum diisi');
-};
+// [UBAH] ditambah parameter prefix (sama seperti getFormValues)
+const markInvalid = (errors, prefix = '') =>
+  Object.keys(errors).forEach((id) => getEl(prefix + id).classList.add('invalid'));
 
 // ===== RENDER TABEL, FILTER, REKAP =====
 const createCell = (text) => {
@@ -75,16 +63,67 @@ const renderFilterOptions = () => {
   select.value = categories.includes(current) ? current : '';
 };
 
-const renderTable = () => {
+// ----- [BARU] pembantu untuk kolom Tampil (badge) dan Aksi (tombol) -----
+const isActive = (p) => p.active !== false; // data lama tanpa field "active" dianggap aktif
+
+const applyBadge = (btn, active) => {
+  btn.classList.toggle('inactive', !active); // classList.toggle (Tugas Praktikum 5)
+  btn.textContent = active ? 'Aktif' : 'Nonaktif';
+};
+
+const createButton = (label, className, onClick) => {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = className;
+  btn.textContent = label;
+  btn.addEventListener('click', onClick);
+  return btn;
+};
+
+const createBadgeCell = (p) => {
+  const td = document.createElement('td');
+  const badge = createButton('', 'badge-toggle', () => handleToggle(p.id, badge));
+  applyBadge(badge, isActive(p));
+  td.appendChild(badge);
+  return td;
+};
+
+const createActionCell = (p) => {
+  const td = document.createElement('td');
+  td.append(
+    createButton('Edit', 'btn btn-sm btn-edit', () => openEditModal(p.id)),
+    createButton('Hapus', 'btn btn-sm btn-delete', () => handleDeleteProduct(p.id)),
+  );
+  return td;
+};
+
+// [UBAH] renderTable: tambah pencarian, data-id, kolom Tampil & Aksi (kolom lama tetap sama)
+const renderTable = (newId = null) => {
   const selected = getEl('filter-category').value || null;
-  const { products } = filterProducts(productDataset, selected); // dari logic.js
+  const { products: byCategory } = filterProducts(productDataset, selected); // dari logic.js
+  const keyword = getEl('search-input').value.trim().toLowerCase();
+  const products = byCategory.filter((p) =>
+    keyword === '' || p.name.toLowerCase().includes(keyword) || p.category.toLowerCase().includes(keyword));
   const tbody = getEl('product-table-body');
   tbody.replaceChildren();
 
+  if (products.length === 0) {
+    const tr = document.createElement('tr');
+    const td = createCell('Tidak ada data yang cocok.');
+    td.colSpan = 8;
+    td.className = 'empty-cell';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  }
+
   products.forEach((p) => {
     const tr = document.createElement('tr');
+    tr.setAttribute('data-id', p.id);                 // dipakai untuk mencari baris saat dihapus
+    if (p.id === newId) tr.classList.add('fade-in');  // efek muncul untuk data baru
     [p.id, p.name, p.category, formatRupiah(p.price), p.stock, getStockStatus(p.stock)]
       .forEach((v) => tr.appendChild(createCell(v)));
+    tr.appendChild(createBadgeCell(p));
+    tr.appendChild(createActionCell(p));
     tbody.appendChild(tr);
   });
   getEl('product-count').textContent = products.length;
@@ -105,13 +144,17 @@ const renderRecap = () => {
   });
 };
 
-const refreshView = () => {
+const refreshView = (newId = null) => {
   renderFilterOptions();
-  renderTable();
+  renderTable(newId);
+  renderProductCards(productDataset, '#product-container', newId); // [BARU] kartu di samping form (logic.js)
   renderRecap();
 };
 
-// ===== SUBMIT =====
+// ===== SUBMIT (TAMBAH) =====
+// [BARU] ID = ID terbesar + 1 (productDataset.length + 1 bisa kembar setelah ada data yang dihapus)
+const getNextId = () => Math.max(0, ...productDataset.map((p) => p.id)) + 1;
+
 const handleSubmit = (event, form, feedback) => {
   event.preventDefault(); // cegah reload
 
@@ -121,19 +164,107 @@ const handleSubmit = (event, form, feedback) => {
 
   if (!valid) {
     markInvalid(errors);
+    console.warn('Validasi gagal (tambah):', errors);
     showFeedback(feedback, 'Gagal: ' + Object.values(errors).join(' '), 'error');
     return;
   }
 
-  const newProduct = { id: productDataset.length + 1, ...values };
+  const newProduct = { id: getNextId(), ...values, active: true };
   productDataset.push(newProduct);
+  saveProducts(); // [BARU] simpan ke localStorage
   console.log('Data produk berhasil ditambahkan:', newProduct);
 
   showFeedback(feedback, `Sukses! Produk '${newProduct.name}' (${formatRupiah(newProduct.price)}) tersimpan.`, 'success');
 
-  refreshView();   // perbarui tabel + rekap
+  getEl('search-input').value = ''; // supaya produk baru langsung terlihat
+  getEl('filter-category').value = '';
+  refreshView(newProduct.id); // perbarui tabel + rekap
   form.reset();    // kosongkan form
-  updatePreview(); // kosongkan preview
+};
+
+// ===== [BARU] HAPUS: fade-out lalu remove() =====
+const handleDeleteProduct = (productId) => {
+  const target = productDataset.find((p) => p.id === productId);
+  if (!target) return;
+  if (!window.confirm(`Hapus produk "${target.name}"?`)) return;
+
+  const rowToDelete = document.querySelector(`tr[data-id="${productId}"]`);
+  const cardToDelete = document.querySelector(`article[data-id="${productId}"]`); // kartu di samping form
+  if (rowToDelete) {
+    if (rowToDelete.classList.contains('fade-out')) return; // cegah klik ganda
+    rowToDelete.classList.add('fade-out');
+  }
+  if (cardToDelete) cardToDelete.classList.add('fade-out');
+
+  setTimeout(() => {
+    const index = productDataset.findIndex((p) => p.id === productId);
+    productDataset.splice(index, 1);
+    saveProducts();
+    console.log(`Produk ID ${productId} (${target.name}) berhasil dihapus. Sisa: ${productDataset.length}`);
+    refreshView();
+  }, 300);
+};
+
+// ===== [BARU] TOGGLE status aktif / nonaktif =====
+const handleToggle = (productId, badge) => {
+  const product = productDataset.find((p) => p.id === productId);
+  if (!product) return;
+  product.active = !isActive(product);
+  saveProducts();
+  applyBadge(badge, product.active);
+  renderProductCards(productDataset); // kartu ikut diperbarui
+  console.log(`Status ${product.name} sekarang ${product.active ? 'AKTIF' : 'NONAKTIF'}`);
+};
+
+// ===== [BARU] EDIT lewat modal =====
+let editingId = null;
+
+const openEditModal = (productId) => {
+  const product = productDataset.find((p) => p.id === productId);
+  if (!product) return;
+  editingId = productId;
+  clearInvalidMarks();
+  getEl('edit-feedback').className = 'feedback-msg';
+  getEl('edit-feedback').textContent = '';
+  getEl('edit-product-name').value = product.name;
+  getEl('edit-product-category').value = product.category;
+  getEl('edit-product-price').value = product.price;
+  getEl('edit-product-stock').value = product.stock;
+
+  getEl('edit-modal').classList.add('open');
+  getEl('edit-modal').setAttribute('aria-hidden', 'false');
+  getEl('edit-product-name').focus();
+  console.log('Edit produk dibuka:', { ...product });
+};
+
+const closeEditModal = () => {
+  getEl('edit-modal').classList.remove('open');
+  getEl('edit-modal').setAttribute('aria-hidden', 'true');
+  editingId = null;
+};
+
+const handleEditSubmit = (event) => {
+  event.preventDefault();
+  clearInvalidMarks();
+  const values = getFormValues('edit-');
+  const { errors, valid } = validateProduct(values, editingId);
+
+  if (!valid) {
+    markInvalid(errors, 'edit-');
+    console.warn('Validasi gagal (edit):', errors);
+    showFeedback(getEl('edit-feedback'), 'Gagal: ' + Object.values(errors).join(' '), 'error');
+    return;
+  }
+
+  const product = productDataset.find((p) => p.id === editingId);
+  const before = { ...product };
+  Object.assign(product, values); // timpa name, category, price, stock
+  saveProducts();
+  console.log('Produk diedit. Sebelum:', before, '| Sesudah:', { ...product });
+
+  closeEditModal();
+  refreshView();
+  showFeedback(getEl('form-feedback'), `Produk '${product.name}' berhasil diperbarui.`, 'success');
 };
 
 // ===== INISIALISASI =====
@@ -143,10 +274,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   form.addEventListener('submit', (event) => handleSubmit(event, form, feedback));
 
-  ['product-name', 'product-price', 'product-stock'].forEach((id) =>
-    getEl(id).addEventListener('input', updatePreview));
-  getEl('product-category').addEventListener('change', updatePreview);
-  getEl('filter-category').addEventListener('change', renderTable);
+  getEl('filter-category').addEventListener('change', () => renderTable());
+
+  // [BARU] pencarian, tombol Reset Form, modal edit, Reset Data
+  getEl('search-input').addEventListener('input', () => renderTable());
+  getEl('btn-reset-form').addEventListener('click', () => {
+    form.reset();
+    clearInvalidMarks();
+  });
+  getEl('edit-form').addEventListener('submit', handleEditSubmit);
+  getEl('btn-cancel-edit').addEventListener('click', closeEditModal);
+  getEl('edit-modal').addEventListener('click', (e) => { if (e.target === getEl('edit-modal')) closeEditModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEditModal(); });
+  getEl('btn-reset-data').addEventListener('click', () => {
+    if (!window.confirm('Kembalikan semua data ke data contoh awal?')) return;
+    productDataset.splice(0, productDataset.length, ...JSON.parse(JSON.stringify(seedDataset)));
+    saveProducts();
+    refreshView();
+  });
 
   refreshView(); 
 });

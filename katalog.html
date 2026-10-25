@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Katalog Produk UMKM</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <script src="assets/js/logic.js"></script>
+</head>
+<body>
+    <h1>Katalog Produk UMKM</h1>
+    <p>Halaman ini hanya menampilkan produk. <a href="index.html" class="nav-link">&larr; Ke halaman admin</a></p>
+
+    <main class="catalog">
+        <div class="toolbar catalog-toolbar">
+            <input type="search" id="search-input" placeholder="Cari produk...">
+            <select id="filter-category" aria-label="Filter kategori"></select>
+            <span class="count-text"><span id="product-count">0</span> produk</span>
+        </div>
+
+        <div id="product-container" class="cards-grid"></div>
+        <p id="empty-state" class="empty-state" hidden>Produk tidak ditemukan.</p>
+    </main>
+
+    <script src="assets/js/katalog.js"></script>
+</body>
+</html>

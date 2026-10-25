@@ -9,7 +9,9 @@
 </head>
 <body>
     <h1>Praktik 4: Form Interaktif Produk UMKM</h1>
-    <p>Buka Console browser (F12 lalu tab Console) untuk melihat hasilnya.</p>
+    <p>Buka Console browser (F12 lalu tab Console) untuk melihat hasilnya.
+       <!-- [BARU] link ke halaman client -->
+       <a href="katalog.html" class="nav-link">Lihat Katalog Produk (halaman client) &rarr;</a></p>
 
     <main class="layout">
         <section class="card">
@@ -46,23 +48,17 @@
                 </div>
 
                 <button type="submit" class="btn">Simpan Produk</button>
+                <!-- [BARU] tombol kosongkan form (sesuai sketsa: Tambah / Hapus) -->
+                <button type="button" class="btn btn-ghost" id="btn-reset-form">Reset Form</button>
             </form>
 
             <div id="form-feedback" class="feedback-msg" role="status" aria-live="polite"></div>
         </section>
 
         <aside class="card">
-            <h2>Live Preview</h2>
-            <div class="preview-box">
-                <p class="preview-label">Nama</p>
-                <p id="preview-name" class="preview-value muted">Belum diisi</p>
-                <p class="preview-label">Kategori</p>
-                <p id="preview-category" class="preview-value muted">Belum dipilih</p>
-                <p class="preview-label">Harga</p>
-                <p id="preview-price" class="preview-value muted">Belum diisi</p>
-                <p class="preview-label">Stok</p>
-                <p id="preview-stock" class="preview-value muted">Belum diisi</p>
-            </div>
+            <!-- [UBAH] Live Preview diganti Data Product Card (sesuai papan tulis) -->
+            <h2>Data Product Card</h2>
+            <div id="product-container" class="cards-grid compact cards-panel"></div>
 
             <h2>Rekap Stok</h2>
             <ul id="recap-list" class="plain-list"></ul>
@@ -71,20 +67,65 @@
         <section class="card wide">
             <div class="list-head">
                 <h2>Daftar Produk (<span id="product-count">0</span>)</h2>
-                <label class="filter-label" for="filter-category">Filter kategori
-                    <select id="filter-category"></select>
-                </label>
+                <div class="toolbar">
+                    <!-- [BARU] kotak pencarian & tombol reset data -->
+                    <input type="search" id="search-input" placeholder="Cari nama / kategori...">
+                    <label class="filter-label" for="filter-category">Filter kategori
+                        <select id="filter-category"></select>
+                    </label>
+                    <button type="button" class="btn btn-ghost btn-sm" id="btn-reset-data">Reset Data Contoh</button>
+                </div>
             </div>
             <div class="table-wrap">
                 <table>
                     <thead>
-                        <tr><th>ID</th><th>Nama</th><th>Kategori</th><th>Harga</th><th>Stok</th><th>Status</th></tr>
+                        <tr><th>ID</th><th>Nama</th><th>Kategori</th><th>Harga</th><th>Stok</th><th>Status</th><th>Tampil</th><th>Aksi</th></tr>
                     </thead>
                     <tbody id="product-table-body"></tbody>
                 </table>
             </div>
         </section>
     </main>
+
+    <!-- [BARU] MODAL EDIT -->
+    <div class="modal-overlay" id="edit-modal" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <h2 id="modal-title">Edit Produk</h2>
+            <form id="edit-form" novalidate>
+                <div class="form-group">
+                    <label for="edit-product-name">Nama Produk</label>
+                    <input type="text" id="edit-product-name">
+                </div>
+                <div class="form-group">
+                    <label for="edit-product-category">Kategori</label>
+                    <select id="edit-product-category">
+                        <option value="">-- Pilih kategori --</option>
+                        <option value="Makanan">Makanan</option>
+                        <option value="Minuman">Minuman</option>
+                        <option value="Dessert">Dessert</option>
+                        <option value="Camilan">Camilan</option>
+                        <option value="Fashion">Fashion</option>
+                        <option value="Kerajinan">Kerajinan</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-product-price">Harga (Rp)</label>
+                        <input type="number" id="edit-product-price" min="1000">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-product-stock">Stok</label>
+                        <input type="number" id="edit-product-stock" min="0" step="1">
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="submit" class="btn">Simpan Perubahan</button>
+                    <button type="button" class="btn btn-ghost" id="btn-cancel-edit">Batal</button>
+                </div>
+            </form>
+            <div id="edit-feedback" class="feedback-msg" role="status" aria-live="polite"></div>
+        </div>
+    </div>
 
     <script src="assets/js/form_handler.js"></script>
 </body>
